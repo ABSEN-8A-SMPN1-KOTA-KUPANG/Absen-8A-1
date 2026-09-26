@@ -260,19 +260,135 @@ async function submitAttendance(){
     "service_el21xtu",
     "template_nain78f",
     {
-      nama: name,
-      status: selected.value,
-      waktu: time + " WITA"
+      nama_siswa: name,
+      status_kehadiran: selected.value,
+      tanggal: formatDate(d),
+      waktu: time,
+      nama_developer: "Dev: MADZxSIGMA / MADZ PROJECT",
+      nama_sistem: "Sistem Absensi Siswa"
     }
-  )
-  .then(function(response) {
+  )  .then(function(response) {
     console.log("EMAIL BERHASIL:", response.status, response.text);
+    console.log("DATA EMAIL:", {
+      nama_siswa: name,
+      status_kehadiran: selected.value,
+      tanggal: formatDate(d),
+      waktu: time
+    });
 
     document.getElementById("name").value="";
     document.querySelectorAll('input[name="status"]').forEach(x=>x.checked=false);
     render();
 
     alert(`✅ Absensi dan email berhasil dikirim!\n\nNama: ${name}\nStatus: ${selected.value}\nWaktu: ${time} WITA`);
+  })
+  .catch(function(error) {
+    console.error("EMAIL GAGAL:", error);
+
+    alert(
+      "❌ Absensi tersimpan di website, tetapi email GAGAL dikirim.\n\n" +
+      "Error: " + JSON.stringify(error)
+    );
+
+    render();
+  });
+}
+
+function safe(text){
+  const d=document.createElement("div");d.textContent=text;return d.innerHTML;
+}
+
+function render(){
+  const data=getData();
+  const counts={Hadir:0,Sakit:0,Izin:0,Alpa:0};
+  data.forEach(x=>counts[x.status]++);
+
+  document.getElementById("hadirCount").textContent=counts.Hadir;
+  document.getElementById("sakitCount").textContent=counts.Sakit;
+  document.getElementById("izinCount").textContent=counts.Izin;
+  document.getElementById("alpaCount").textContent=counts.Alpa;
+
+  const list=document.getElementById("list");
+  if(!data.length){
+    list.innerHTML='<div class="empty">📭 Belum ada absensi hari ini.</div>';
+    return;
+  }
+
+  list.innerHTML="";
+  data.forEach((x,i)=>{
+    const info=statusInfo[x.status];
+    const el=document.createElement("div");
+    el.className="student";
+    el.style.borderLeftColor=info.color;
+    el.innerHTML=`
+      <div class="info">
+        <div class="number">${i+1}</div>
+        <div>
+          <div class="name">${safe(x.name)}</div>
+          <div class="sent">🕐 ${x.time} WITA</div>
+        </div>
+      </div>
+      <div class="badge" style="background:${info.color}22;color:${info.color}">
+        ${info.emoji} ${x.status}
+      </div>`;
+    list.appendChild(el);
+  });
+}
+
+
+
+
+// PIN admin saat ini: 739164  (ubah PIN dengan membuat hash SHA-256 baru jika diperlukan)
+const RESET_PIN_HASH = "0864f7d7e73de9fea449e594a1ebf95ac3da44a16ce5aa4ac98acb97e5f985d6";
+
+async function requestReset(){
+  const pin = prompt("🔐 RESET ABSENSI\n\nMasukkan PIN admin:");
+  if(pin === null) return;
+
+  const hash = Array.from(new Uint8Array(
+    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(pin))
+  )).map(b=>b.toString(16).padStart(2,"0")).join("");
+
+  if(hash !== RESET_PIN_HASH){
+    alert("❌ PIN salah. Absensi tidak di-reset.");
+    return;
+  }
+
+  if(!confirm("⚠️ Yakin ingin menghapus SEMUA absensi hari ini?")) return;
+
+  try{
+    cache={date:dateKey(),absensi:[]};
+    await saveRemote();
+
+    // Pastikan database sudah berisi data kosong.
+    await fetchRemote();
+    cache={date:dateKey(),absensi:[]};
+    render();
+
+    alert("✅ Semua absensi hari ini berhasil dihapus dari JSONBin.");
+  }catch(e){
+    alert("❌ Reset gagal. Data database tidak diubah.");
+  }
+}
+
+document.getElementById("name").addEventListener("keydown",e=>{
+  if(e.key==="Enter")submitAttendance();
+});
+
+let lastDate=dateKey();
+updateClock();
+
+async function initialLoad(){
+  try{ await fetchRemote(); }catch(e){ warning("⚠️ Gagal memuat data dari database."); }
+  render();
+}
+initialLoad();
+setInterval(()=>{ updateClock(); },1000);
+setInterval(async ()=>{ try{ await fetchRemote(); render(); }catch(e){} },15000);
+</script>
+</body>
+</html>
+hasil dikirim!\n\nNama: ${name}\nStatus: ${selected.value}\nWaktu: ${time} WITA`);
   })
   .catch(function(error) {
     console.error("EMAIL GAGAL:", error);
